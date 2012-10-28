@@ -1,4 +1,6 @@
 spa-jsv
-=======
+========
 
-JSV forms metadata example
+Building Single Page Web Applications: JavaScript End to End
+
+Form generation and validation using JSON schema and JSV

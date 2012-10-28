@@ -1,0 +1,47 @@
+{ "type" : "object",
+  "additionalProperties": false,
+  "properties" : {
+    "_id": { "type": "string" },
+    "css_map": { "type": "object" },
+    "is_online" : { "type": "boolean" },
+    "name" : {
+      "type"     : "string",
+      "pattern"  : "^[A-Za-z0-9_-]{3,15}",
+      "required" : true,
+
+      "_is_settable": true,
+      "_doc_uri"    : "",
+      "_label_text" : "Username",
+      "_info_text"  : "Your username as viewed by others",
+      "_note_text"  : "Please avoid profaninity...",
+      "_help_text"  : "Your username should be between 3 and 15 characters long and contain only letters, numbers, underscores, or dashes.",
+      "_priority_index" : 90
+    },
+    "phone_num" : {
+      "type"     : "string",
+      "pattern"  : "^[0-9]{3}-?[0-9]{3}-?[0-9]{4}$",
+      "required" : false,
+
+      "_is_settable": true,
+      "_doc_uri"    : "",
+      "_label_text" : "Phone #",
+      "_info_text"  : "Your primary telephone number",
+      "_note_text"  : "Please select the number we may use to call you.  We recommend the use of an office or cell number.",
+      "_help_text"  : "Please enter a 10-digit US number.  Dashes are optional.",
+      "_priority_index" : 80
+    },
+    "address1" : {
+      "type"      : "string",
+      "minimumLength" : 3,
+      "required"  : true,
+
+      "_is_settable": true,
+      "_doc_uri"    : "",
+      "_label_text" : "Address 1",
+      "_info_text"  : "The first line of your address",
+      "_note_text"  : "This should be the first line of your mailing address, as found on your credit card billing statement",
+      "_help_text"  : "This value is required, and must be longer than 3 characters in length",
+      "_priority_index" : 70
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{ "name"    : "SPA-JSV",
+  "version" : "0.0.1",
+  "private" : true,
+  "dependencies" : {
+    "express"   : "2.4.4",
+    "JSV"       : "4.0.2"
+  }
+}

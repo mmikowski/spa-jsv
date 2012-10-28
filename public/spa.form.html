@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+
+<!--
+  form.html
+  Example form generation and validation using json schema
+
+  Michael S. Mikowski - mike.mikowski@gmail.com
+  Copyright (c) 2011-2012 Manning Publications Co.
+-->
+
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+  <!-- ie9+ rendering support for latest standards -->
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>SPA Form validation with JSV</title>
+
+  <style>
+  .form-field { width : 416px; margin-top : 32px; }
+  .form-field-info, .form-field-title, .form-field-value {
+    position    : relative;
+    float       : left;
+    height      : 32px;
+    line-height : 32px;
+  }
+  .form-field-info  { width : 32px; cursor : help; }
+  .form-field-title { width : 128px; }
+  .form-field-value { width : 192px; }
+  .form-field-value input {
+    width   : 100%;
+    height  : 16px;
+    padding : 4px;
+    border  : 1px solid #888;
+    color   : #666;
+    background : #eee;
+  }
+  .form-field-help  { width : 352px; }
+  .form-field-value input:focus {
+    background : #ff8;
+    color      : #440;
+  }
+
+  </style>
+
+  <script src="js/jq/jquery-1.7.js"    ></script>
+
+  <script src="js/lib-jsv/uri/uri.js"></script>
+  <script src="js/lib-jsv/jsv.js"></script>
+  <script src="js/lib-jsv/json-schema-draft-03.js"></script>
+
+  <script src="js/spa.js"></script>
+  <script src="js/spa.util.js"></script>
+  <script src="js/spa.util_b.js"></script>
+
+  <script>
+
+/*jslint         browser : true, continue : true,
+  devel  : true, indent  : 2,    maxerr   : 50,
+  newcap : true, nomen   : true, plusplus : true,
+  regexp : true, sloppy  : true, vars     : false,
+  white  : true
+*/
+
+/*global $, JSV, spa */
+$(function (){
+  var
+    configMap = {
+      regex_suri  : /^[^#]+#\//,
+      regex_tmplt : /%!%([^%]+)%!%/g,
+      open_html   : '<form id="form">',
+      field_html  : String()
+        + '<div class="form-field">'
+          + '<div class="form-field-info"'
+            + 'title="%!%info_text%!%">'
+            + '(i) '
+          + '</div>'
+          + '<div class="form-field-title"'
+            + 'title="%!%note_text%!%">'
+            + '%!%label_text%!%'
+          + '</div>'
+          + '<div class="form-field-value">'
+            + '<input type="string" data-field="%!%key%!%"'
+              + 'value="%!%value%!%"'
+            + '>'
+          + '</div>'
+          + '<div class="form-field-help">%!%help_text%!%</div>'
+        + '</div>',
+      close_html : String()
+        + '<div class="form-buttons">'
+          + '<input type="submit" value="Go"/>'
+        + '</div></form>'
+    },
+    stateMap  = { $container : null, schema_map : null },
+    jqueryMap = {},
+
+    jsvEngine = JSV,
+
+    fillTemplate, getMapVal, getSchemaPath,
+    validateJson, fetchJson,     loadSchema,
+    setJqueryMap, writeFormHtml,
+    onSubmit,     bindHandlers,  initModule
+    ;
+
+  fillTemplate = function ( arg_map ){
+    var
+      input_string = arg_map.input_string,
+      lookup_map   = arg_map.lookup_map
+      ;
+
+    return input_string.replace(
+      configMap.regex_tmplt,
+      function ( match, name ) {
+        return lookup_map[name] || '';
+      }
+    );
+  };
+
+  // arg_val may be an array of nodes, e.g. [ 'people','men','bobs' ],
+  // or may be a single period delimitged string e.g. people.men.bobs
+  getMapVal = function ( arg_map, arg_path_list ) {
+    var key, path_list,
+      walk_map = arg_map,
+      is_good = true;
+
+    path_list = spa.util.getVarType( arg_path_list) === 'Array'
+      ? arg_path_list.slice() : arg_path_list.split('.');
+
+    while ( true ) {
+      key = path_list.shift();
+      if ( key === undefined ){ break; }
+
+      if ( ! walk_map.hasOwnProperty( key ) ){
+        is_good = false; break;
+      }
+      walk_map = walk_map[ key ];
+    }
+    if ( is_good ){ return walk_map; }
+    throw 'Could not find path';
+  };
+
+  getSchemaPath = function ( arg_path_list ){
+    var i, schema_path_list = [],
+      path_list = spa.util.getVarType( arg_path_list ) === 'Array'
+      ? arg_path_list.slice() : arg_path_list.split('.'),
+      end_count = path_list.length - 1;
+
+    // build schema path (are we not clever?)
+    for ( i = 0; i <= end_count; i++ ){
+      if ( i < end_count ){
+        schema_path_list.push( 'properties' );
+      }
+      schema_path_list.push( path_list[i] );
+    }
+    return schema_path_list;
+  };
+
+  validateJson = function ( instance_map, schema_map ) {
+    var
+      i, schema_path_list, instance_path_list,
+      report_map, output_list, jsv_env,
+      instance_data, schema_data
+      ;
+
+    jsv_env = jsvEngine.createEnvironment();
+    report_map  = jsv_env.validate( instance_map, schema_map );
+    output_list = [];
+
+    console.log('Begin validation');
+    console.warn( Object.keys(instance_map) );
+    console.log(report_map);
+    for ( i = 0; i < report_map.errors.length; i ++ ){
+      schema_path_list = report_map.errors[i].schemaUri
+        .replace( configMap.regex_suri, '')
+        .split('/');
+      schema_path_list.push('_help_text');
+
+      instance_path_list = report_map.errors[i].uri
+        .replace( configMap.regex_suri, '')
+        .split('/');
+
+      try {
+        instance_data = getMapVal( instance_map, instance_path_list );
+      }
+      catch (err1) { instance_data = '<not found>'; }
+      try {
+        schema_data = getMapVal( schema_map, schema_path_list );
+      }
+      catch (err2) { schema_data = '<not found>'; }
+
+      output_list.push(
+        instance_path_list.join('.')
+        + ' : ( value of "'
+        + String( instance_data )
+        + ' "):\n'
+        + schema_path_list.join('.')
+        + ' : '
+        + String( schema_data )
+      );
+    }
+
+    if ( output_list.length === 0 ){
+      console.log('pass ...');
+    }
+    else {
+      console.warn( 'fail:...' );
+      console.warn( output_list.join('\n'));
+    }
+    console.log('End validation');
+  };
+
+  fetchJson = function ( arg_map ){
+    $.ajax(
+      arg_map.uri,
+      { accepts    : { json : 'application/json' },
+        dataType   : 'json',
+        type       : 'GET',
+        success    : arg_map.cb_success, // gets data, status_type, jqXHR
+        error      : arg_map.cb_error    // gets jqXHR, status_type, error
+      }
+    );
+  };
+
+  setJqueryMap = function (){
+    jqueryMap = {
+      $container : stateMap.$container,
+      $form      : $('#form')
+    };
+  };
+
+  writeFormHtml = function ( schema_map ){
+    var
+      key, val_map, field_html, i,
+      lookup_map = {},
+      field_list = [],
+      prop_map   = schema_map.properties,
+      output_html   = configMap.open_html
+      ;
+
+    PARAM:
+    for ( key in prop_map ){
+      if ( prop_map.hasOwnProperty( key ) ){
+        val_map = prop_map[ key ];
+        if ( ! val_map._is_settable ){ continue PARAM; }
+        lookup_map = {
+          doc_uri    : val_map._doc_uri    || '',
+          label_text : val_map._label_text || '',
+          info_text  : val_map._info_text  || '',
+          note_text  : val_map._note_text  || '',
+          help_text  : val_map._help_text  || '',
+          key        : key
+        };
+
+        field_html = fillTemplate({
+          input_string : configMap.field_html,
+          lookup_map   : lookup_map
+        });
+        field_list.push({
+          html : field_html,
+          priority_index : val_map.priority_index || 0
+        });
+      }
+    }
+
+    field_list.sort( function ( a, b ){
+      return a.priority_index - b.priority_index;
+    });
+
+    for ( i = 0; i < field_list.length; i++ ){
+      output_html += field_list[i].html + '\n';
+    }
+
+    output_html += configMap.close_html;
+
+    stateMap.$container.html( output_html );
+  };
+
+  onSubmit = function (){
+    var form_map = {};
+    jqueryMap.$container.find('input[type=string]').each(function ( idx, elem ){
+      var $elem = $(elem),
+        key   = $elem.attr('data-field'),
+        value = $elem.prop('value')
+        ;
+      if ( value ){ form_map[ key ] = value; }
+    });
+    try { validateJson( form_map, stateMap.schema_map ); }
+    catch ( error ){ console.error( error ); }
+    return false;
+  };
+
+  bindHandlers = function ( schema_map ){
+    stateMap.schema_map = schema_map;
+    jqueryMap.$form.submit( onSubmit );
+  };
+
+  initModule = function ( $container ){
+    stateMap.$container = $container;
+    fetchJson({
+      uri        : 'js/schema/users.json',
+      cb_success : [ writeFormHtml, setJqueryMap, bindHandlers ],
+      cb_error   : function (){ console.error( 'ajax failed', arguments ); }
+    });
+  };
+
+
+  initModule($('.form-field'));
+
+});
+  </script>
+
+</head>
+<body>
+  <div class="form-field"></div>
+</body>
+</html>
